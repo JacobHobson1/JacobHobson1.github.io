@@ -1,11 +1,11 @@
 window.onload = function () {
   const data = [
     { date: "2024-01-01", value: 100 },
-    { date: "2024-02-01", value: 120 },
+    { date: "2024-02-01", value: 10 },
     { date: "2024-03-01", value: 90 },
-    { date: "2024-04-01", value: 140 },
-    { date: "2024-05-01", value: 160 },
-    { date: "2024-06-01", value: 130 }
+    { date: "2024-04-01", value: 40 },
+    { date: "2024-05-01", value: 60 },
+    { date: "2024-06-01", value: 100 }
   ];
 
   const parseDate = d3.timeParse("%Y-%m-%d");
