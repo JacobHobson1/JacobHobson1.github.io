@@ -16,7 +16,7 @@ window.onload = function () {
 
   const width = 1200;
   const height = 500;
-  const margin = { top: 20, right: 30, bottom: 40, left: 50 };
+  const margin = { top: 20, right: 30, bottom: 40, left: 30 };
 
   const svg = d3.select("svg");
 
