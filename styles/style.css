@@ -1,5 +1,10 @@
-#chart_container {
+#chart-container {
     border: 2px solid black;
-    width:1500px;
+    width:1000px;
     margin: 0 auto;
+    text-align: center;
+}
+
+#chart-container svg {
+  display: inline-block;
 }
