@@ -28,51 +28,50 @@ window.onload = function () {
     .domain([0, d3.max(data, d => d.value)]).nice()
     .range([height - margin.bottom, margin.top]);
 
-  const xAxis = svg.append("g")
+  const xAxis = g => g
     .attr("transform", `translate(0,${height - margin.bottom})`)
-    .call(d3.axisBottom(x));
+    .call(d3.axisBottom(x).ticks(6).tickFormat(d3.timeFormat("%b %Y")));
 
-  const yAxis = svg.append("g")
+  const yAxis = g => g
     .attr("transform", `translate(${margin.left},0)`)
     .call(d3.axisLeft(y));
+
+  svg.append("g").call(xAxis);
+  svg.append("g").call(yAxis);
 
   const line = d3.line()
     .x(d => x(d.date))
     .y(d => y(d.value));
 
-  const clip = svg.append("defs").append("SVG:clipPath")
+  const clip = svg.append("defs").append("clipPath")
     .attr("id", "clip")
-    .append("SVG:rect")
-    .attr("width", width - margin.left - margin.right)
-    .attr("height", height - margin.top - margin.bottom)
+    .append("rect")
     .attr("x", margin.left)
-    .attr("y", margin.top);
+    .attr("y", margin.top)
+    .attr("width", width - margin.left - margin.right)
+    .attr("height", height - margin.top - margin.bottom);
 
-  const chartBody = svg.append("g")
+  const chartArea = svg.append("g")
     .attr("clip-path", "url(#clip)");
 
-  const path = chartBody.append("path")
+  const path = chartArea.append("path")
     .datum(data)
-    .attr("class", "line")
     .attr("fill", "none")
     .attr("stroke", "steelblue")
     .attr("stroke-width", 2)
     .attr("d", line);
 
+  const gx = svg.select("g");
+
   const zoom = d3.zoom()
-    .scaleExtent([1, 10]) // Zoom in/out limits
+    .scaleExtent([1, 10])
     .translateExtent([[margin.left, 0], [width - margin.right, height]])
     .extent([[margin.left, 0], [width - margin.right, height]])
-    .on("zoom", zoomed);
+    .on("zoom", (event) => {
+      const newX = event.transform.rescaleX(x);
+      gx.call(d3.axisBottom(newX).ticks(6).tickFormat(d3.timeFormat("%b %Y")));
+      path.attr("d", line.x(d => newX(d.date)));
+    });
 
   svg.call(zoom);
-
-  function zoomed(event) {
-    const newX = event.transform.rescaleX(x);
-    xAxis.call(d3.axisBottom(newX).ticks(6));
-    path.attr("d", d3.line()
-      .x(d => newX(d.date))
-      .y(d => y(d.value))
-    );
-  }
 };
