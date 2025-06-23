@@ -1,8 +1,5 @@
 #chart-container {
     border: 2px solid black;
-    text-align: center;
-}
-
-#chart-container svg {
-  display: inline-block;
+    display:flex;
+    justify-content: center;
 }
