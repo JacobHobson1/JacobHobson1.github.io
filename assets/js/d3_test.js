@@ -107,7 +107,7 @@ window.onload = async function () {
   }
 
   const width = 1200;
-  const height = 500;
+  const height = 400;
   const margin = { top: 20, right: 30, bottom: 60, left: 80 };
 
   const svg = d3.select("svg");
@@ -185,18 +185,19 @@ window.onload = async function () {
     .attr("stroke-width", 3)
     .attr("stroke-dasharray", "5,5");
 
-  // Add model layer execution markers - make them more visible
+  // Add model layer execution markers as vertical lines (like the reference image)
   const chartHeight = height - margin.bottom - margin.top;
   
-  chartArea.selectAll(".profile-line")
+  // Add start markers for each layer
+  chartArea.selectAll(".profile-start-line")
     .data(profileEvents.slice(0, 15)) // Show first 15 layers for clarity
     .enter()
     .append("line")
-    .attr("class", "profile-line")
+    .attr("class", "profile-start-line")
     .attr("x1", d => x(d.relativeStart))
-    .attr("x2", d => x(d.relativeEnd))
-    .attr("y1", (d, i) => chartHeight * 0.1 + (i % 10) * (chartHeight * 0.05)) // Position in top 60% of chart
-    .attr("y2", (d, i) => chartHeight * 0.1 + (i % 10) * (chartHeight * 0.05))
+    .attr("x2", d => x(d.relativeStart))
+    .attr("y1", 0)
+    .attr("y2", chartHeight)
     .attr("stroke", d => {
       if (d.op_name.includes('Conv')) return '#ff7f0e';
       if (d.op_name.includes('MaxPool')) return '#2ca02c';
@@ -204,9 +205,30 @@ window.onload = async function () {
       if (d.op_name.includes('Reduce')) return '#9467bd';
       return '#1f77b4';
     })
-    .attr("stroke-width", 3)
-    .attr("stroke-dasharray", "2,4")
-    .attr("opacity", 0.8);
+    .attr("stroke-width", 1)
+    .attr("stroke-dasharray", "2,3")
+    .attr("opacity", 0.7);
+
+  // Add end markers for longer operations (optional, for duration visualization)
+  chartArea.selectAll(".profile-end-line")
+    .data(profileEvents.filter(d => d.duration > 10).slice(0, 10)) // Only show end lines for longer operations
+    .enter()
+    .append("line")
+    .attr("class", "profile-end-line")
+    .attr("x1", d => x(d.relativeEnd))
+    .attr("x2", d => x(d.relativeEnd))
+    .attr("y1", 0)
+    .attr("y2", chartHeight)
+    .attr("stroke", d => {
+      if (d.op_name.includes('Conv')) return '#ff7f0e';
+      if (d.op_name.includes('MaxPool')) return '#2ca02c';
+      if (d.op_name.includes('Gemm')) return '#d62728';
+      if (d.op_name.includes('Reduce')) return '#9467bd';
+      return '#1f77b4';
+    })
+    .attr("stroke-width", 1)
+    .attr("stroke-dasharray", "4,2")
+    .attr("opacity", 0.5);
 
   // Add tooltip
   const tooltip = d3.select("body").append("div")
@@ -242,15 +264,41 @@ window.onload = async function () {
       tooltip.transition().duration(200).style("opacity", 0);
     });
 
-  // Add hover for profile events
-  chartArea.selectAll(".profile-line")
+  // Add hover for profile start lines
+  chartArea.selectAll(".profile-start-line")
     .on("mouseover", function(event, d) {
+      d3.select(this).attr("stroke-width", 3).attr("opacity", 1);
       tooltip.transition().duration(200).style("opacity", 1);
-      tooltip.html(`Layer: ${d.name}<br/>Operation: ${d.op_name}<br/>Duration: ${d.duration.toFixed(2)}ms<br/>Start: ${d.relativeStart.toFixed(0)}ms`)
+      tooltip.html(`
+        <strong>${d.name}</strong><br/>
+        Operation: ${d.op_name}<br/>
+        Duration: ${d.duration.toFixed(2)}ms<br/>
+        Start: ${d.relativeStart.toFixed(0)}ms
+      `)
         .style("left", (event.pageX + 10) + "px")
         .style("top", (event.pageY - 10) + "px");
     })
     .on("mouseout", function() {
+      d3.select(this).attr("stroke-width", 1).attr("opacity", 0.7);
+      tooltip.transition().duration(200).style("opacity", 0);
+    });
+
+  // Add hover for profile end lines
+  chartArea.selectAll(".profile-end-line")
+    .on("mouseover", function(event, d) {
+      d3.select(this).attr("stroke-width", 3).attr("opacity", 1);
+      tooltip.transition().duration(200).style("opacity", 1);
+      tooltip.html(`
+        <strong>${d.name} (END)</strong><br/>
+        Operation: ${d.op_name}<br/>
+        Duration: ${d.duration.toFixed(2)}ms<br/>
+        End: ${d.relativeEnd.toFixed(0)}ms
+      `)
+        .style("left", (event.pageX + 10) + "px")
+        .style("top", (event.pageY - 10) + "px");
+    })
+    .on("mouseout", function() {
+      d3.select(this).attr("stroke-width", 1).attr("opacity", 0.5);
       tooltip.transition().duration(200).style("opacity", 0);
     });
 
@@ -264,7 +312,8 @@ window.onload = async function () {
     { color: "red", label: "Function End", dash: "5,5" },
     { color: "#ff7f0e", label: "Conv Layers", dash: "3,3" },
     { color: "#2ca02c", label: "MaxPool Layers", dash: "3,3" },
-    { color: "#d62728", label: "Gemm Layers", dash: "3,3" }
+    { color: "#9467bd", label: "Reduce Layers", dash: "2,4" },
+    { color: "#1f77b4", label: "Other Layers", dash: "2,4" }
   ];
 
   legend.selectAll(".legend-item")
@@ -308,9 +357,14 @@ window.onload = async function () {
         .attr("x1", d => newX(d.milliseconds))
         .attr("x2", d => newX(d.milliseconds));
 
-      // Update profile lines on zoom
-      chartArea.selectAll(".profile-line")
+      // Update profile start lines on zoom
+      chartArea.selectAll(".profile-start-line")
         .attr("x1", d => newX(d.relativeStart))
+        .attr("x2", d => newX(d.relativeStart));
+
+      // Update profile end lines on zoom
+      chartArea.selectAll(".profile-end-line")
+        .attr("x1", d => newX(d.relativeEnd))
         .attr("x2", d => newX(d.relativeEnd));
 
       // Update hover circles on zoom
