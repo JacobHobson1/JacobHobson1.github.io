@@ -1,6 +1,6 @@
 body{
     margin:0;
-    background-color: #fbfbfb;
+    background-color: #f0f0f0;
 }
 
 
@@ -63,7 +63,7 @@ body{
     display: flex;
     flex-direction: column;
     justify-content: center;
-    border: solid 1px #f0f0f0;
+    border: solid 1px #d2d2d2;
     border-radius: 5px;
     margin:10px;
     padding:5px;
