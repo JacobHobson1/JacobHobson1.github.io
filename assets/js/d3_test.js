@@ -80,13 +80,31 @@ window.onload = async function () {
     e.milliseconds = e.date - startTime;
   });
 
-  // Convert profile events to relative time (they're already in milliseconds)
-  profileEvents.forEach(p => {
-    // Profile timestamps appear to be relative to some start point, we need to align them
-    // with our energy data timeline. This might need adjustment based on your data.
-    p.relativeStart = p.startTime;
-    p.relativeEnd = p.endTime;
-  });
+  // Convert profile events to align with energy timeline
+  // The profile data starts from a different time reference, we need to map it to our energy timeline
+  if (profileEvents.length > 0) {
+    const profileStartTime = Math.min(...profileEvents.map(p => p.startTime));
+    const energyStartTime = 0; // Our energy data starts at 0ms
+    
+    // Assume the profile data corresponds to the function execution period
+    // Map profile time range to the function start/end period in energy data
+    const funcStart = events.find(e => e.event.includes('start'))?.milliseconds || 0;
+    const funcEnd = events.find(e => e.event.includes('end'))?.milliseconds || data[data.length-1].milliseconds;
+    
+    const profileDuration = Math.max(...profileEvents.map(p => p.endTime)) - profileStartTime;
+    const energyDuration = funcEnd - funcStart;
+    
+    // Scale and shift profile events to match energy timeline
+    profileEvents.forEach(p => {
+      const normalizedStart = (p.startTime - profileStartTime) / profileDuration;
+      const normalizedEnd = (p.endTime - profileStartTime) / profileDuration;
+      
+      p.relativeStart = funcStart + (normalizedStart * energyDuration);
+      p.relativeEnd = funcStart + (normalizedEnd * energyDuration);
+    });
+    
+    console.log(`Profile events mapped to ${funcStart}-${funcEnd}ms range`);
+  }
 
   const width = 1200;
   const height = 400;
@@ -167,26 +185,28 @@ window.onload = async function () {
     .attr("stroke-width", 3)
     .attr("stroke-dasharray", "5,5");
 
-  // Add model layer execution markers
-  const layerColors = d3.scaleOrdinal(d3.schemeCategory10);
+  // Add model layer execution markers - make them more visible
+  const chartHeight = height - margin.bottom - margin.top;
   
   chartArea.selectAll(".profile-line")
-    .data(profileEvents.slice(0, 20)) // Limit to first 20 for clarity
+    .data(profileEvents.slice(0, 15)) // Show first 15 layers for clarity
     .enter()
     .append("line")
     .attr("class", "profile-line")
     .attr("x1", d => x(d.relativeStart))
     .attr("x2", d => x(d.relativeEnd))
-    .attr("y1", (d, i) => (height - margin.bottom - margin.top) - 20 - (i % 5) * 4)
-    .attr("y2", (d, i) => (height - margin.bottom - margin.top) - 20 - (i % 5) * 4)
+    .attr("y1", (d, i) => chartHeight * 0.1 + (i % 10) * (chartHeight * 0.05)) // Position in top 60% of chart
+    .attr("y2", (d, i) => chartHeight * 0.1 + (i % 10) * (chartHeight * 0.05))
     .attr("stroke", d => {
       if (d.op_name.includes('Conv')) return '#ff7f0e';
       if (d.op_name.includes('MaxPool')) return '#2ca02c';
       if (d.op_name.includes('Gemm')) return '#d62728';
+      if (d.op_name.includes('Reduce')) return '#9467bd';
       return '#1f77b4';
     })
-    .attr("stroke-width", 2)
-    .attr("stroke-dasharray", "3,3");
+    .attr("stroke-width", 3)
+    .attr("stroke-dasharray", "2,4")
+    .attr("opacity", 0.8);
 
   // Add tooltip
   const tooltip = d3.select("body").append("div")
