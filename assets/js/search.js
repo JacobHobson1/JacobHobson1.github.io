@@ -1,3 +1,13 @@
+function count_occurrences(array) {
+    const counts = {};
+    
+    array.forEach(item => {
+        counts[item] = (counts[item] || 0) + 1;
+    });
+    
+    return counts;
+}
+
 Papa.parse("assets/csv/dummy.csv", {
     download: true,
     header: true,
@@ -8,3 +18,6 @@ Papa.parse("assets/csv/dummy.csv", {
         console.log(tasks);
     }
 });
+
+const dict = count_occurences(devices);
+console.log(dict);
