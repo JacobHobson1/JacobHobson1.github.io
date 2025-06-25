@@ -29,12 +29,12 @@ window.onload = async function () {
   
   try {
     // Load energy data
-    const energyResponse = await fetch('./energy_log.txt');
+    const energyResponse = await fetch('results/resnet34-exp1/energy_log.txt');
     const energyLogText = await energyResponse.text();
     data = parseEnergyData(energyLogText);
     
     // Load event data
-    const eventResponse = await fetch('./event_log.txt');
+    const eventResponse = await fetch('results/resnet34-exp1/event_log.txt');
     const eventLogText = await eventResponse.text();
     events = parseEventData(eventLogText);
     
@@ -45,31 +45,40 @@ window.onload = async function () {
     return; // Exit if files can't be loaded
   }
 
-  // Your existing code with minimal changes:
-  const parseDate = d3.timeParse("%Y-%m-%d %H:%M:%S");
-  // Remove the parseDate forEach loop since dates are already parsed
+  // Convert data to relative time scale (milliseconds from start) and watts
+  if (data.length === 0) return;
+  
+  const startTime = data[0].date;
+  data.forEach(d => {
+    d.milliseconds = d.date - startTime; // Convert to milliseconds from start
+    d.watts = d.value / 1000000; // Convert microwatts to watts
+  });
+  
+  events.forEach(e => {
+    e.milliseconds = e.date - startTime;
+  });
 
   const width = 1200;
   const height = 500;
-  const margin = { top: 20, right: 30, bottom: 40, left: 80 }; // Increased left margin for larger numbers
+  const margin = { top: 20, right: 30, bottom: 60, left: 80 };
 
   const svg = d3.select("svg");
 
-  const x = d3.scaleTime()
-    .domain(d3.extent(data, d => d.date))
+  const x = d3.scaleLinear()
+    .domain([0, d3.max(data, d => d.milliseconds)])
     .range([margin.left, width - margin.right]);
 
   const y = d3.scaleLinear()
-    .domain([0, d3.max(data, d => d.value)]).nice()
+    .domain([0, d3.max(data, d => d.watts)]).nice()
     .range([height - margin.bottom, margin.top]);
 
   const xAxis = g => g
     .attr("transform", `translate(0,${height - margin.bottom})`)
-    .call(d3.axisBottom(x).ticks(6).tickFormat(d3.timeFormat("%H:%M:%S")));
+    .call(d3.axisBottom(x).ticks(10).tickFormat(d => d.toFixed(0) + "ms"));
 
   const yAxis = g => g
     .attr("transform", `translate(${margin.left},0)`)
-    .call(d3.axisLeft(y).tickFormat(d => (d/1000000).toFixed(1) + "M")); // Format as megawatts
+    .call(d3.axisLeft(y).tickFormat(d => d.toFixed(1) + "W"));
 
   svg.append("g").call(xAxis);
   svg.append("g").call(yAxis);
@@ -90,10 +99,10 @@ window.onload = async function () {
     .style("text-anchor", "middle")
     .style("font-size", "14px")
     .style("font-weight", "bold")
-    .text("Time (seconds from start)");
+    .text("Time (milliseconds from start)");
 
   const line = d3.line()
-    .x(d => x(d.seconds))
+    .x(d => x(d.milliseconds))
     .y(d => y(d.watts));
 
   const clip = svg.append("defs").append("clipPath")
@@ -120,8 +129,8 @@ window.onload = async function () {
     .enter()
     .append("line")
     .attr("class", "event-line")
-    .attr("x1", d => x(d.seconds))
-    .attr("x2", d => x(d.seconds))
+    .attr("x1", d => x(d.milliseconds))
+    .attr("x2", d => x(d.milliseconds))
     .attr("y1", 0)
     .attr("y2", height - margin.bottom - margin.top)
     .attr("stroke", d => d.event.includes('start') ? "green" : "red")
@@ -146,14 +155,14 @@ window.onload = async function () {
     .enter()
     .append("circle")
     .attr("class", "hover-circle")
-    .attr("cx", d => x(d.seconds))
+    .attr("cx", d => x(d.milliseconds))
     .attr("cy", d => y(d.watts))
     .attr("r", 3)
     .attr("fill", "transparent")
     .on("mouseover", function(event, d) {
       d3.select(this).attr("fill", "steelblue");
       tooltip.transition().duration(200).style("opacity", 1);
-      tooltip.html(`Time: ${d.seconds.toFixed(3)}s<br/>Power: ${d.watts.toFixed(3)}W`)
+      tooltip.html(`Time: ${d.milliseconds.toFixed(0)}ms<br/>Power: ${d.watts.toFixed(3)}W`)
         .style("left", (event.pageX + 10) + "px")
         .style("top", (event.pageY - 10) + "px");
     })
@@ -170,19 +179,18 @@ window.onload = async function () {
     .extent([[margin.left, 0], [width - margin.right, height]])
     .on("zoom", (event) => {
       const newX = event.transform.rescaleX(x);
-      gx.call(d3.axisBottom(newX).ticks(10).tickFormat(d => d.toFixed(1) + "s"));
-      path.attr("d", line.x(d => newX(d.seconds)));
+      gx.call(d3.axisBottom(newX).ticks(10).tickFormat(d => d.toFixed(0) + "ms"));
+      path.attr("d", line.x(d => newX(d.milliseconds)));
       
       // Update event lines on zoom
       chartArea.selectAll(".event-line")
-        .attr("x1", d => newX(d.seconds))
-        .attr("x2", d => newX(d.seconds));
+        .attr("x1", d => newX(d.milliseconds))
+        .attr("x2", d => newX(d.milliseconds));
 
       // Update hover circles on zoom
       chartArea.selectAll(".hover-circle")
-        .attr("cx", d => newX(d.seconds));
+        .attr("cx", d => newX(d.milliseconds));
     });
 
   svg.call(zoom);
 };
-
