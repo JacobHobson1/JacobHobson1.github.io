@@ -41,6 +41,7 @@ window.onload = async function () {
   let data = [];
   let events = [];
   let profileEvents = [];
+  let profileStartTime = null;
   
   try {
     // Load energy data
@@ -57,6 +58,17 @@ window.onload = async function () {
     const profileResponse = await fetch('results/resnet34-exp1/model_profile.json');
     const profileJson = await profileResponse.json();
     profileEvents = parseProfileData(profileJson);
+    
+    // Try to load performance log to get the start time reference
+    try {
+      const perfResponse = await fetch('results/resnet34-exp1/performance_log.json');
+      const perfJson = await perfResponse.json();
+      profileStartTime = new Date(perfJson.start_time);
+      console.log('Profile start time found:', profileStartTime);
+    } catch (e) {
+      console.log('Performance log not found, using energy start time as reference');
+      profileStartTime = data[0].date;
+    }
     
     console.log(`Loaded ${data.length} energy readings, ${events.length} events, and ${profileEvents.length} profile events`);
   } catch (error) {
@@ -80,30 +92,21 @@ window.onload = async function () {
     e.milliseconds = e.date - startTime;
   });
 
-  // Convert profile events to align with energy timeline
-  // The profile data starts from a different time reference, we need to map it to our energy timeline
-  if (profileEvents.length > 0) {
-    const profileStartTime = Math.min(...profileEvents.map(p => p.startTime));
-    const energyStartTime = 0; // Our energy data starts at 0ms
-    
-    // Assume the profile data corresponds to the function execution period
-    // Map profile time range to the function start/end period in energy data
-    const funcStart = events.find(e => e.event.includes('start'))?.milliseconds || 0;
-    const funcEnd = events.find(e => e.event.includes('end'))?.milliseconds || data[data.length-1].milliseconds;
-    
-    const profileDuration = Math.max(...profileEvents.map(p => p.endTime)) - profileStartTime;
-    const energyDuration = funcEnd - funcStart;
-    
-    // Scale and shift profile events to match energy timeline
+  // Convert profile events to absolute timestamps (like the Python version)
+  if (profileEvents.length > 0 && profileStartTime) {
     profileEvents.forEach(p => {
-      const normalizedStart = (p.startTime - profileStartTime) / profileDuration;
-      const normalizedEnd = (p.endTime - profileStartTime) / profileDuration;
+      // Convert microseconds to milliseconds and add to start time
+      const startDate = new Date(profileStartTime.getTime() + (p.startTime / 1000));
+      const endDate = new Date(profileStartTime.getTime() + (p.endTime / 1000));
       
-      p.relativeStart = funcStart + (normalizedStart * energyDuration);
-      p.relativeEnd = funcStart + (normalizedEnd * energyDuration);
+      // Convert to relative milliseconds from energy start time
+      p.relativeStart = startDate.getTime() - startTime.getTime();
+      p.relativeEnd = endDate.getTime() - startTime.getTime();
     });
     
-    console.log(`Profile events mapped to ${funcStart}-${funcEnd}ms range`);
+    console.log(`Profile events mapped using absolute timing`);
+    console.log(`First profile event: ${profileEvents[0].relativeStart}ms`);
+    console.log(`Last profile event: ${profileEvents[profileEvents.length-1].relativeEnd}ms`);
   }
 
   const width = 1200;
