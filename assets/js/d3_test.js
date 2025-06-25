@@ -107,7 +107,7 @@ window.onload = async function () {
   }
 
   const width = 1200;
-  const height = 400;
+  const height = 500;
   const margin = { top: 20, right: 30, bottom: 60, left: 80 };
 
   const svg = d3.select("svg");
