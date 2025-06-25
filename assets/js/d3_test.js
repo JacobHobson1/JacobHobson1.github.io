@@ -1,22 +1,57 @@
-window.onload = function () {
-  const data = [
-    { date: "2024-01-01", value: 100 },
-    { date: "2024-02-01", value: 10 },
-    { date: "2024-03-01", value: 90 },
-    { date: "2024-04-01", value: 40 },
-    { date: "2024-05-01", value: 60 },
-    { date: "2024-06-01", value: 100 }
-  ];
+window.onload = async function () {
+  // Function to parse energy log data
+  function parseEnergyData(text) {
+    const lines = text.trim().split('\n');
+    return lines.map(line => {
+      const [timestamp, value] = line.split(': ');
+      return {
+        date: new Date(timestamp),
+        value: +value
+      };
+    });
+  }
 
-  const parseDate = d3.timeParse("%Y-%m-%d");
-  data.forEach(d => {
-    d.date = parseDate(d.date);
-    d.value = +d.value;
-  });
+  // Function to parse event data
+  function parseEventData(text) {
+    const lines = text.trim().split('\n');
+    return lines.map(line => {
+      const [timestamp, event] = line.split(': ');
+      return {
+        date: new Date(timestamp),
+        event: event
+      };
+    });
+  }
+
+  // Load files from your GitHub Pages directory
+  let data = [];
+  let events = [];
+  
+  try {
+    // Load energy data
+    const energyResponse = await fetch('results/resnet34-exp1/energy_log.txt');
+    const energyLogText = await energyResponse.text();
+    data = parseEnergyData(energyLogText);
+    
+    // Load event data
+    const eventResponse = await fetch('results/resnet34-exp1/event_log.txt');
+    const eventLogText = await eventResponse.text();
+    events = parseEventData(eventLogText);
+    
+    console.log(`Loaded ${data.length} energy readings and ${events.length} events`);
+  } catch (error) {
+    console.error('Error loading data files:', error);
+    console.log('Files not found. Place energy_log.txt and event_log.txt in your repository root.');
+    return; // Exit if files can't be loaded
+  }
+
+  // Your existing code with minimal changes:
+  const parseDate = d3.timeParse("%Y-%m-%d %H:%M:%S");
+  // Remove the parseDate forEach loop since dates are already parsed
 
   const width = 1200;
   const height = 500;
-  const margin = { top: 20, right: 30, bottom: 40, left: 30 };
+  const margin = { top: 20, right: 30, bottom: 40, left: 80 }; // Increased left margin for larger numbers
 
   const svg = d3.select("svg");
 
@@ -30,11 +65,11 @@ window.onload = function () {
 
   const xAxis = g => g
     .attr("transform", `translate(0,${height - margin.bottom})`)
-    .call(d3.axisBottom(x).ticks(6).tickFormat(d3.timeFormat("%b %Y")));
+    .call(d3.axisBottom(x).ticks(6).tickFormat(d3.timeFormat("%H:%M:%S")));
 
   const yAxis = g => g
     .attr("transform", `translate(${margin.left},0)`)
-    .call(d3.axisLeft(y));
+    .call(d3.axisLeft(y).tickFormat(d => (d/1000000).toFixed(1) + "M")); // Format as megawatts
 
   svg.append("g").call(xAxis);
   svg.append("g").call(yAxis);
@@ -61,6 +96,20 @@ window.onload = function () {
     .attr("stroke-width", 2)
     .attr("d", line);
 
+  // Add event markers
+  chartArea.selectAll(".event-line")
+    .data(events)
+    .enter()
+    .append("line")
+    .attr("class", "event-line")
+    .attr("x1", d => x(d.date))
+    .attr("x2", d => x(d.date))
+    .attr("y1", margin.top)
+    .attr("y2", height - margin.bottom)
+    .attr("stroke", d => d.event.includes('start') ? "green" : "red")
+    .attr("stroke-width", 2)
+    .attr("stroke-dasharray", "5,5");
+
   const gx = svg.select("g");
 
   const zoom = d3.zoom()
@@ -69,8 +118,13 @@ window.onload = function () {
     .extent([[margin.left, 0], [width - margin.right, height]])
     .on("zoom", (event) => {
       const newX = event.transform.rescaleX(x);
-      gx.call(d3.axisBottom(newX).ticks(6).tickFormat(d3.timeFormat("%b %Y")));
+      gx.call(d3.axisBottom(newX).ticks(6).tickFormat(d3.timeFormat("%H:%M:%S")));
       path.attr("d", line.x(d => newX(d.date)));
+      
+      // Update event lines on zoom
+      chartArea.selectAll(".event-line")
+        .attr("x1", d => newX(d.date))
+        .attr("x2", d => newX(d.date));
     });
 
   svg.call(zoom);

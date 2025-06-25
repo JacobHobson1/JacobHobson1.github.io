@@ -88,3 +88,31 @@ body{
 .checkbox-item {
     display:block;
 }
+
+.vis-flex-container {
+    display: flex;
+    margin-left:20px;
+    margin-right:20px;
+    align-items: flex-start;
+}
+
+.vis-flex-container > * {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border: solid 1px #d2d2d2;
+    border-radius: 5px;
+    margin:10px;
+    padding:5px;
+}
+
+.vis-sidebar {
+    flex:2;
+    height:70%;
+
+}
+
+.vis-results {
+    flex:7;
+
+}
