@@ -2,6 +2,9 @@ Papa.parse("assets/csv/dummy.csv", {
     download: true,
     header: true,
     complete: function(results) {
-        console.log(results.data);
+        const devices = results.data.map(row => row.device_name);
+        const tasks = results.data.map(row => row.task)
+        console.log(devices);
+        console.log(tasks);
     }
 });
