@@ -80,3 +80,7 @@ body{
     flex:7;
 
 }
+
+.checkbox-item {
+    display:block;
+}
