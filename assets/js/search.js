@@ -16,8 +16,12 @@ Papa.parse("assets/csv/dummy.csv", {
         const tasks = results.data.map(row => row.task)
         console.log(devices);
         console.log(tasks);
+
+        const deviceCounts = count_occurrences(devices);
+        const taskCounts = count_occurrences(tasks);
+        
+        console.log('Device counts:', deviceCounts);
+        console.log('Task counts:', taskCounts);
     }
 });
 
-const dict = count_occurences(devices);
-console.log(dict);
