@@ -29,12 +29,12 @@ window.onload = async function () {
   
   try {
     // Load energy data
-    const energyResponse = await fetch('results/resnet34-exp1/energy_log.txt');
+    const energyResponse = await fetch('./energy_log.txt');
     const energyLogText = await energyResponse.text();
     data = parseEnergyData(energyLogText);
     
     // Load event data
-    const eventResponse = await fetch('results/resnet34-exp1/event_log.txt');
+    const eventResponse = await fetch('./event_log.txt');
     const eventLogText = await eventResponse.text();
     events = parseEventData(eventLogText);
     
@@ -74,9 +74,27 @@ window.onload = async function () {
   svg.append("g").call(xAxis);
   svg.append("g").call(yAxis);
 
+  // Add axis labels
+  svg.append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("y", 15)
+    .attr("x", -(height / 2))
+    .attr("dy", "1em")
+    .style("text-anchor", "middle")
+    .style("font-size", "14px")
+    .style("font-weight", "bold")
+    .text("Power (Watts)");
+
+  svg.append("text")
+    .attr("transform", `translate(${width / 2}, ${height - 10})`)
+    .style("text-anchor", "middle")
+    .style("font-size", "14px")
+    .style("font-weight", "bold")
+    .text("Time (seconds from start)");
+
   const line = d3.line()
-    .x(d => x(d.date))
-    .y(d => y(d.value));
+    .x(d => x(d.seconds))
+    .y(d => y(d.watts));
 
   const clip = svg.append("defs").append("clipPath")
     .attr("id", "clip")
@@ -102,13 +120,47 @@ window.onload = async function () {
     .enter()
     .append("line")
     .attr("class", "event-line")
-    .attr("x1", d => x(d.date))
-    .attr("x2", d => x(d.date))
-    .attr("y1", margin.top)
-    .attr("y2", height - margin.bottom)
+    .attr("x1", d => x(d.seconds))
+    .attr("x2", d => x(d.seconds))
+    .attr("y1", 0)
+    .attr("y2", height - margin.bottom - margin.top)
     .attr("stroke", d => d.event.includes('start') ? "green" : "red")
     .attr("stroke-width", 2)
     .attr("stroke-dasharray", "5,5");
+
+  // Add tooltip
+  const tooltip = d3.select("body").append("div")
+    .attr("class", "tooltip")
+    .style("position", "absolute")
+    .style("background", "rgba(0, 0, 0, 0.8)")
+    .style("color", "white")
+    .style("padding", "8px")
+    .style("border-radius", "4px")
+    .style("font-size", "12px")
+    .style("pointer-events", "none")
+    .style("opacity", 0);
+
+  // Add invisible circles for hover detection
+  chartArea.selectAll(".hover-circle")
+    .data(data)
+    .enter()
+    .append("circle")
+    .attr("class", "hover-circle")
+    .attr("cx", d => x(d.seconds))
+    .attr("cy", d => y(d.watts))
+    .attr("r", 3)
+    .attr("fill", "transparent")
+    .on("mouseover", function(event, d) {
+      d3.select(this).attr("fill", "steelblue");
+      tooltip.transition().duration(200).style("opacity", 1);
+      tooltip.html(`Time: ${d.seconds.toFixed(3)}s<br/>Power: ${d.watts.toFixed(3)}W`)
+        .style("left", (event.pageX + 10) + "px")
+        .style("top", (event.pageY - 10) + "px");
+    })
+    .on("mouseout", function() {
+      d3.select(this).attr("fill", "transparent");
+      tooltip.transition().duration(200).style("opacity", 0);
+    });
 
   const gx = svg.select("g");
 
@@ -118,13 +170,17 @@ window.onload = async function () {
     .extent([[margin.left, 0], [width - margin.right, height]])
     .on("zoom", (event) => {
       const newX = event.transform.rescaleX(x);
-      gx.call(d3.axisBottom(newX).ticks(6).tickFormat(d3.timeFormat("%H:%M:%S")));
-      path.attr("d", line.x(d => newX(d.date)));
+      gx.call(d3.axisBottom(newX).ticks(10).tickFormat(d => d.toFixed(1) + "s"));
+      path.attr("d", line.x(d => newX(d.seconds)));
       
       // Update event lines on zoom
       chartArea.selectAll(".event-line")
-        .attr("x1", d => newX(d.date))
-        .attr("x2", d => newX(d.date));
+        .attr("x1", d => newX(d.seconds))
+        .attr("x2", d => newX(d.seconds));
+
+      // Update hover circles on zoom
+      chartArea.selectAll(".hover-circle")
+        .attr("cx", d => newX(d.seconds));
     });
 
   svg.call(zoom);
