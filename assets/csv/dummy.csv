@@ -1,0 +1,5 @@
+exp1, NVIDIA Jetson Nano, Image Classification , 5,5,5
+exp2, NVIDIA Jetson Nano, Semantic Segmentation , 5,5,5
+exp3, NVIDIA Jetson Nano, Image Classification , 5,5,5
+exp4, Raspberrry Pi 5, Image Classification , 5,5,5
+exp5, Xilinx Kria KV260, Object Detection , 5,5,5
