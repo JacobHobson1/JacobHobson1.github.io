@@ -1,7 +1,7 @@
 
-const margin = {top: 10, right: 50, bottom: 30, left: 60};
+const margin = {top: 30, right: 50, bottom: 30, left: 60};
 const width = 1200 - margin.left - margin.right;
-const height = 200; // Height per individual chart
+const height = 200;
 
 const tooltip = d3.select(".tooltip");
 
@@ -13,8 +13,8 @@ const metrics = [
 ];
 
 Promise.all([
-  d3.csv("results/resnet34-exp1/combined.csv", d3.autoType),
-  d3.json("results/resnet34-exp1/func_events.json")
+  d3.csv("combined.csv", d3.autoType),
+  d3.json("func_events.json")
 ]).then(([data, events]) => {
   data.forEach(d => d.timestamp = new Date(d.timestamp));
   events.forEach(e => {
@@ -35,7 +35,6 @@ Promise.all([
     .on("zoom", zoomed);
 
   const chartContainer = d3.select("#chart-container");
-
   const charts = [];
 
   metrics.forEach((metric, i) => {
@@ -72,7 +71,7 @@ Promise.all([
 
     g.append("text")
       .attr("x", 5)
-      .attr("y", margin.top - 5)
+      .attr("y", margin.top - 10)
       .text(metric.label)
       .style("font-size", "12px");
 
@@ -81,11 +80,21 @@ Promise.all([
       const lineStart = g.append("line")
         .attr("x1", x(e.start)).attr("x2", x(e.start))
         .attr("y1", y.range()[1]).attr("y2", y.range()[0])
-        .attr("stroke", "blue").attr("class", "func-line").attr("stroke-dasharray", "4,2").attr("opacity", 0.4);
+        .attr("stroke", "blue")
+        .attr("class", "func-line")
+        .attr("stroke-dasharray", "4,2")
+        .attr("opacity", 0.4);
+      lineStart.append("title").text(`Func Start: ${e.start.toLocaleTimeString()}`);
+
       const lineEnd = g.append("line")
         .attr("x1", x(e.end)).attr("x2", x(e.end))
         .attr("y1", y.range()[1]).attr("y2", y.range()[0])
-        .attr("stroke", "red").attr("class", "func-line").attr("stroke-dasharray", "4,2").attr("opacity", 0.4);
+        .attr("stroke", "red")
+        .attr("class", "func-line")
+        .attr("stroke-dasharray", "4,2")
+        .attr("opacity", 0.4);
+      lineEnd.append("title").text(`Func End: ${e.end.toLocaleTimeString()}`);
+
       funcLines.push({ start: lineStart, end: lineEnd, data: e });
     });
 
@@ -106,7 +115,7 @@ Promise.all([
       })
       .on("mousemove", function(event) {
         const bisect = d3.bisector(d => d.timestamp).left;
-        const mouseX = d3.pointer(event, this)[0];
+        const [mouseX, mouseY] = d3.pointer(event);
         const x0 = x.invert(mouseX);
         const i = bisect(data, x0, 1);
         const d0 = data[i - 1], d1 = data[i];
@@ -114,9 +123,13 @@ Promise.all([
         focus.attr("transform", `translate(${x(d.timestamp)},${y(d[metric.key])})`);
         tooltip
           .style("display", "block")
-          .style("left", (d3.pointer(event)[0] + 70) + "px")
-          .style("top", (d3.pointer(event)[1] + i * height + 20) + "px")
-          .html(`${metric.label}<br>${d[metric.key].toFixed(2)}<br>${d.timestamp.toLocaleString()}`);
+          .style("left", `${event.pageX + 10}px`)
+          .style("top", `${event.pageY - 30}px`)
+          .html(`
+            <strong>${metric.label}</strong><br>
+            Value: ${d[metric.key].toFixed(2)}<br>
+            Time: ${d.timestamp.toLocaleTimeString()}
+          `);
       });
 
     charts.push({ svg, g, y, line, path, funcLines });
