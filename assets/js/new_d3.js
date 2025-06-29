@@ -13,8 +13,8 @@ const metrics = [
 ];
 
 Promise.all([
-  d3.csv("combined.csv", d3.autoType),
-  d3.json("func_events.json")
+  d3.csv("results/resnet34-exp1/combined.csv", d3.autoType),
+  d3.json("results/resnet34-exp1/func_events.json")
 ]).then(([data, events]) => {
   data.forEach(d => d.timestamp = new Date(d.timestamp));
   events.forEach(e => {
