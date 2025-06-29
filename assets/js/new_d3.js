@@ -119,15 +119,8 @@ Promise.all([
     const focus = g.append("g").style("display", "none");
     focus.append("circle").attr("r", 3.5).attr("fill", metric.color);
 
-    const overlay = g.append("rect")
-      .attr("class", "overlay")
-      .attr("width", width)
-      .attr("height", height - margin.top - margin.bottom)
-      .attr("x", 0)
-      .attr("y", margin.top)
-      .attr("fill", "transparent");
-
-    overlay.on("mouseover", () => focus.style("display", null))
+    path
+      .on("mouseover", () => focus.style("display", null))
       .on("mouseout", () => {
         focus.style("display", "none");
         tooltip.style("display", "none");
@@ -136,21 +129,30 @@ Promise.all([
         const t = d3.zoomTransform(svg.node());
         const newX = t.rescaleX(x);
         const bisect = d3.bisector(d => d.timestamp).left;
-        const [mouseX] = d3.pointer(event, this);
+        const [mouseX, mouseY] = d3.pointer(event, g.node());
         const x0 = newX.invert(mouseX);
         const i = bisect(data, x0, 1);
         const d0 = data[i - 1], d1 = data[i];
         const d = (!d1 || x0 - d0.timestamp < d1.timestamp - x0) ? d0 : d1;
-        focus.attr("transform", `translate(${newX(d.timestamp)},${y(d[metric.key])})`);
-        tooltip
-          .style("display", "block")
-          .style("left", `${event.pageX + 10}px`)
-          .style("top", `${event.pageY - 30}px`)
-          .html(`
-            <strong>${metric.label}</strong><br>
-            Value: ${d[metric.key].toFixed(2)}<br>
-            Time: ${d.timestamp.toLocaleTimeString()}
-          `);
+
+        const xPos = newX(d.timestamp);
+        const yPos = y(d[metric.key]);
+
+        if (Math.abs(mouseY - yPos) < 10) {
+          focus.attr("transform", `translate(${xPos},${yPos})`);
+          tooltip
+            .style("display", "block")
+            .style("left", `${event.pageX + 10}px`)
+            .style("top", `${event.pageY - 30}px`)
+            .html(`
+              <strong>${metric.label}</strong><br>
+              Value: ${d[metric.key].toFixed(2)}<br>
+              Time: ${d.timestamp.toLocaleTimeString()}
+            `);
+        } else {
+          focus.style("display", "none");
+          tooltip.style("display", "none");
+        }
       });
 
     charts.push({ svg, g, y, line, path, funcLines });
