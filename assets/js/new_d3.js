@@ -14,13 +14,19 @@ const metrics = [
 
 Promise.all([
   d3.csv("results/resnet34-exp1/combined.csv", d3.autoType),
-  d3.json("results/resnet34-exp1/func_events.json")
-]).then(([data, events]) => {
+  d3.json("results/resnet34-exp1/model_profile.json"),
+  d3.json("results/resnet34-exp1/performance_log.json")
+]).then(([data, profileData, perfData]) => {
+  const start_time = new Date(perfData.start_time);
+  const events = profileData
+    .filter(d => d.ph === "X")
+    .map(d => ({
+      name: d.name || "Function",
+      start: new Date(start_time.getTime() + d.ts / 1000),
+      end: new Date(start_time.getTime() + (d.ts + d.dur) / 1000)
+    }));
+
   data.forEach(d => d.timestamp = new Date(d.timestamp));
-  events.forEach(e => {
-    e.start = new Date(e.start);
-    e.end = new Date(e.end);
-  });
 
   const x = d3.scaleTime()
     .domain(d3.extent(data, d => d.timestamp))
@@ -77,7 +83,7 @@ Promise.all([
 
     const funcLines = [];
     events.forEach(e => {
-      g.append("rect")
+      const region = g.append("rect")
         .attr("x", x(e.start))
         .attr("y", y.range()[1])
         .attr("width", x(e.end) - x(e.start))
@@ -91,7 +97,7 @@ Promise.all([
             .style("left", `${event.pageX + 10}px`)
             .style("top", `${event.pageY - 30}px`)
             .html(`
-              <strong>Function Event</strong><br>
+              <strong>${e.name}</strong><br>
               Start: ${e.start.toLocaleTimeString()}<br>
               End: ${e.end.toLocaleTimeString()}
             `);
@@ -112,7 +118,7 @@ Promise.all([
         .attr("stroke-dasharray", "4,2")
         .attr("opacity", 0.4);
 
-      funcLines.push({ start: lineStart, end: lineEnd, data: e });
+      funcLines.push({ start: lineStart, end: lineEnd, region: region, data: e });
     });
 
     const focus = g.append("g").style("display", "none");
@@ -159,9 +165,12 @@ Promise.all([
     const newX = t.rescaleX(x);
     charts.forEach(({ line, path, funcLines, g }) => {
       path.attr("d", line.x(d => newX(d.timestamp)));
-      funcLines.forEach(({ start, end, data }) => {
+      funcLines.forEach(({ start, end, region, data }) => {
         start.attr("x1", newX(data.start)).attr("x2", newX(data.start));
         end.attr("x1", newX(data.end)).attr("x2", newX(data.end));
+        region
+          .attr("x", newX(data.start))
+          .attr("width", newX(data.end) - newX(data.start));
       });
       g.select(".x-axis").call(d3.axisBottom(newX).ticks(6));
     });
