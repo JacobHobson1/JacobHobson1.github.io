@@ -14,19 +14,13 @@ const metrics = [
 
 Promise.all([
   d3.csv("results/resnet34-exp1/combined.csv", d3.autoType),
-  d3.json("results/resnet34-exp1/model_profile.json"),
-  d3.json("results/resnet34-exp1/performance_log.json")
-]).then(([data, profileData, perfData]) => {
-  const start_time = new Date(perfData.start_time);
-  const events = profileData
-    .filter(d => d.ph === "X")
-    .map(d => ({
-      name: d.name || "Function",
-      start: new Date(start_time.getTime() + d.ts / 1000),
-      end: new Date(start_time.getTime() + (d.ts + d.dur) / 1000)
-    }));
-
+  d3.json("results/resnet34-exp1/model_profile_processed.json")
+]).then(([data, events]) => {
   data.forEach(d => d.timestamp = new Date(d.timestamp));
+  events.forEach(e => {
+    e.start = new Date(e.start);
+    e.end = new Date(e.end);
+  });
 
   const x = d3.scaleTime()
     .domain(d3.extent(data, d => d.timestamp))
@@ -83,6 +77,7 @@ Promise.all([
 
     const funcLines = [];
     events.forEach(e => {
+      const duration = ((e.end - e.start) / 1000).toFixed(2); // ms to s
       const region = g.append("rect")
         .attr("x", x(e.start))
         .attr("y", y.range()[1])
@@ -99,7 +94,8 @@ Promise.all([
             .html(`
               <strong>${e.name}</strong><br>
               Start: ${e.start.toLocaleTimeString()}<br>
-              End: ${e.end.toLocaleTimeString()}
+              End: ${e.end.toLocaleTimeString()}<br>
+              Duration: ${duration} s
             `);
         })
         .on("mouseout", () => tooltip.style("display", "none"));
@@ -124,26 +120,29 @@ Promise.all([
     const focus = g.append("g").style("display", "none");
     focus.append("circle").attr("r", 3.5).attr("fill", metric.color);
 
-    g.append("rect")
+    const overlay = g.append("rect")
       .attr("class", "overlay")
       .attr("width", width)
       .attr("height", height - margin.top - margin.bottom)
       .attr("x", 0)
       .attr("y", margin.top)
-      .attr("fill", "transparent")
-      .on("mouseover", () => focus.style("display", null))
+      .attr("fill", "transparent");
+
+    overlay.on("mouseover", () => focus.style("display", null))
       .on("mouseout", () => {
         focus.style("display", "none");
         tooltip.style("display", "none");
       })
       .on("mousemove", function(event) {
+        const t = d3.zoomTransform(svg.node());
+        const newX = t.rescaleX(x);
         const bisect = d3.bisector(d => d.timestamp).left;
-        const [mouseX] = d3.pointer(event);
-        const x0 = x.invert(mouseX);
+        const [mouseX] = d3.pointer(event, this);
+        const x0 = newX.invert(mouseX);
         const i = bisect(data, x0, 1);
         const d0 = data[i - 1], d1 = data[i];
         const d = (!d1 || x0 - d0.timestamp < d1.timestamp - x0) ? d0 : d1;
-        focus.attr("transform", `translate(${x(d.timestamp)},${y(d[metric.key])})`);
+        focus.attr("transform", `translate(${newX(d.timestamp)},${y(d[metric.key])})`);
         tooltip
           .style("display", "block")
           .style("left", `${event.pageX + 10}px`)
