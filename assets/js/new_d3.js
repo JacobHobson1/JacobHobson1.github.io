@@ -1,15 +1,7 @@
 
 const margin = {top: 10, right: 50, bottom: 30, left: 60};
 const width = 1200 - margin.left - margin.right;
-const height = 800;
-const plotHeight = height / 4;
-
-const svg = d3.select("#chart")
-  .append("svg")
-  .attr("width", width + margin.left + margin.right)
-  .attr("height", height + margin.top + margin.bottom);
-
-const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+const height = 200; // Height per individual chart
 
 const tooltip = d3.select(".tooltip");
 
@@ -38,72 +30,74 @@ Promise.all([
 
   const zoom = d3.zoom()
     .scaleExtent([1, 20])
-    .translateExtent([[0, 0], [width, height]])
+    .translateExtent([[0, 0], [width, height * metrics.length]])
     .extent([[0, 0], [width, height]])
     .on("zoom", zoomed);
 
-  svg.call(zoom);
+  const chartContainer = d3.select("#chart-container");
 
-  const chartGroups = [];
+  const charts = [];
 
   metrics.forEach((metric, i) => {
     const y = d3.scaleLinear()
       .domain(d3.extent(data, d => d[metric.key])).nice()
-      .range([plotHeight * (i + 1), plotHeight * i]);
+      .range([height - margin.bottom, margin.top]);
 
     const line = d3.line()
       .x(d => x(d.timestamp))
       .y(d => y(d[metric.key]));
 
-    const group = g.append("g");
+    const svg = chartContainer.append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height);
 
-    const path = group.append("path")
+    const g = svg.append("g").attr("transform", `translate(${margin.left},0)`);
+
+    const path = g.append("path")
       .datum(data)
       .attr("class", "line")
+      .attr("fill", "none")
       .attr("stroke", metric.color)
+      .attr("stroke-width", 1.5)
       .attr("d", line);
 
-    group.append("g")
+    g.append("g")
+      .attr("transform", `translate(0,${height - margin.bottom})`)
+      .attr("class", "x-axis")
+      .call(xAxis);
+
+    g.append("g")
       .attr("transform", `translate(0,0)`)
-      .call(d3.axisLeft(y).ticks(5));
+      .call(d3.axisLeft(y));
 
-    if (i === metrics.length - 1) {
-      group.append("g")
-        .attr("transform", `translate(0,${plotHeight * (i + 1)})`)
-        .attr("class", "x-axis")
-        .call(xAxis);
-    }
-
-    group.append("text")
+    g.append("text")
       .attr("x", 5)
-      .attr("y", y.range()[1] + 15)
+      .attr("y", margin.top - 5)
       .text(metric.label)
       .style("font-size", "12px");
 
     const funcLines = [];
-
     events.forEach(e => {
-      const lineStart = group.append("line")
+      const lineStart = g.append("line")
         .attr("x1", x(e.start)).attr("x2", x(e.start))
         .attr("y1", y.range()[1]).attr("y2", y.range()[0])
-        .attr("stroke", "blue").attr("class", "func-line");
-
-      const lineEnd = group.append("line")
+        .attr("stroke", "blue").attr("class", "func-line").attr("stroke-dasharray", "4,2").attr("opacity", 0.4);
+      const lineEnd = g.append("line")
         .attr("x1", x(e.end)).attr("x2", x(e.end))
         .attr("y1", y.range()[1]).attr("y2", y.range()[0])
-        .attr("stroke", "red").attr("class", "func-line");
-
+        .attr("stroke", "red").attr("class", "func-line").attr("stroke-dasharray", "4,2").attr("opacity", 0.4);
       funcLines.push({ start: lineStart, end: lineEnd, data: e });
     });
 
-    const focus = group.append("g").style("display", "none");
+    const focus = g.append("g").style("display", "none");
     focus.append("circle").attr("r", 3.5).attr("fill", metric.color);
 
-    group.append("rect")
+    g.append("rect")
       .attr("class", "overlay")
       .attr("width", width)
-      .attr("height", y.range()[0] - y.range()[1])
-      .attr("y", y.range()[1])
+      .attr("height", height - margin.top - margin.bottom)
+      .attr("x", 0)
+      .attr("y", margin.top)
       .attr("fill", "transparent")
       .on("mouseover", () => focus.style("display", null))
       .on("mouseout", () => {
@@ -121,23 +115,25 @@ Promise.all([
         tooltip
           .style("display", "block")
           .style("left", (d3.pointer(event)[0] + 70) + "px")
-          .style("top", (d3.pointer(event)[1] + 40) + "px")
+          .style("top", (d3.pointer(event)[1] + i * height + 20) + "px")
           .html(`${metric.label}<br>${d[metric.key].toFixed(2)}<br>${d.timestamp.toLocaleString()}`);
       });
 
-    chartGroups.push({ group, y, line, path, funcLines });
+    charts.push({ svg, g, y, line, path, funcLines });
   });
+
+  d3.selectAll("svg").call(zoom);
 
   function zoomed(event) {
     const t = event.transform;
     const newX = t.rescaleX(x);
-    chartGroups.forEach(({ line, path, funcLines }) => {
+    charts.forEach(({ line, path, funcLines, g }) => {
       path.attr("d", line.x(d => newX(d.timestamp)));
       funcLines.forEach(({ start, end, data }) => {
         start.attr("x1", newX(data.start)).attr("x2", newX(data.start));
         end.attr("x1", newX(data.end)).attr("x2", newX(data.end));
       });
+      g.select(".x-axis").call(d3.axisBottom(newX).ticks(6));
     });
-    g.selectAll(".x-axis").call(d3.axisBottom(newX).ticks(6));
   }
 });
