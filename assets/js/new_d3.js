@@ -4,7 +4,7 @@ const width = 1200 - margin.left - margin.right;
 const height = 800;
 const plotHeight = height / 4;
 
-const svg = d3.select("#chart-container")
+const svg = d3.select("#chart")
   .append("svg")
   .attr("width", width + margin.left + margin.right)
   .attr("height", height + margin.top + margin.bottom);
@@ -21,8 +21,8 @@ const metrics = [
 ];
 
 Promise.all([
-  d3.csv("results/resnet34-exp1/combined.csv", d3.autoType),
-  d3.json("results/resnet34-exp1/func_events.json")
+  d3.csv("combined.csv", d3.autoType),
+  d3.json("func_events.json")
 ]).then(([data, events]) => {
   data.forEach(d => d.timestamp = new Date(d.timestamp));
   events.forEach(e => {
@@ -80,16 +80,20 @@ Promise.all([
       .text(metric.label)
       .style("font-size", "12px");
 
+    const funcLines = [];
+
     events.forEach(e => {
-      group.append("line")
+      const lineStart = group.append("line")
         .attr("x1", x(e.start)).attr("x2", x(e.start))
         .attr("y1", y.range()[1]).attr("y2", y.range()[0])
         .attr("stroke", "blue").attr("class", "func-line");
 
-      group.append("line")
+      const lineEnd = group.append("line")
         .attr("x1", x(e.end)).attr("x2", x(e.end))
         .attr("y1", y.range()[1]).attr("y2", y.range()[0])
         .attr("stroke", "red").attr("class", "func-line");
+
+      funcLines.push({ start: lineStart, end: lineEnd, data: e });
     });
 
     const focus = group.append("g").style("display", "none");
@@ -98,7 +102,7 @@ Promise.all([
     group.append("rect")
       .attr("class", "overlay")
       .attr("width", width)
-      .attr("height", plotHeight)
+      .attr("height", y.range()[0] - y.range()[1])
       .attr("y", y.range()[1])
       .attr("fill", "transparent")
       .on("mouseover", () => focus.style("display", null))
@@ -121,14 +125,18 @@ Promise.all([
           .html(`${metric.label}<br>${d[metric.key].toFixed(2)}<br>${d.timestamp.toLocaleString()}`);
       });
 
-    chartGroups.push({ group, y, line, path });
+    chartGroups.push({ group, y, line, path, funcLines });
   });
 
   function zoomed(event) {
     const t = event.transform;
     const newX = t.rescaleX(x);
-    chartGroups.forEach(({ line, path }) => {
+    chartGroups.forEach(({ line, path, funcLines }) => {
       path.attr("d", line.x(d => newX(d.timestamp)));
+      funcLines.forEach(({ start, end, data }) => {
+        start.attr("x1", newX(data.start)).attr("x2", newX(data.start));
+        end.attr("x1", newX(data.end)).attr("x2", newX(data.end));
+      });
     });
     g.selectAll(".x-axis").call(d3.axisBottom(newX).ticks(6));
   }
