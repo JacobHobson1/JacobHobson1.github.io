@@ -11,6 +11,23 @@ body{
 }
 
 #chart-container svg {
+    display: block;
+}
+
+.tooltip {
+  position: absolute;
+  display: none;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  font-size: 12px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+
+#chart-container svg {
     border-radius: 4px;
     padding:5px;
     border: 1px solid #f0f0f0;
