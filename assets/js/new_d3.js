@@ -77,23 +77,40 @@ Promise.all([
 
     const funcLines = [];
     events.forEach(e => {
+      g.append("rect")
+        .attr("x", x(e.start))
+        .attr("y", y.range()[1])
+        .attr("width", x(e.end) - x(e.start))
+        .attr("height", y.range()[0] - y.range()[1])
+        .attr("fill", "blue")
+        .attr("opacity", 0.05)
+        .attr("pointer-events", "all")
+        .on("mouseover", function(event) {
+          tooltip
+            .style("display", "block")
+            .style("left", `${event.pageX + 10}px`)
+            .style("top", `${event.pageY - 30}px`)
+            .html(`
+              <strong>Function Event</strong><br>
+              Start: ${e.start.toLocaleTimeString()}<br>
+              End: ${e.end.toLocaleTimeString()}
+            `);
+        })
+        .on("mouseout", () => tooltip.style("display", "none"));
+
       const lineStart = g.append("line")
         .attr("x1", x(e.start)).attr("x2", x(e.start))
         .attr("y1", y.range()[1]).attr("y2", y.range()[0])
         .attr("stroke", "blue")
-        .attr("class", "func-line")
         .attr("stroke-dasharray", "4,2")
         .attr("opacity", 0.4);
-      lineStart.append("title").text(`Func Start: ${e.start.toLocaleTimeString()}`);
 
       const lineEnd = g.append("line")
         .attr("x1", x(e.end)).attr("x2", x(e.end))
         .attr("y1", y.range()[1]).attr("y2", y.range()[0])
         .attr("stroke", "red")
-        .attr("class", "func-line")
         .attr("stroke-dasharray", "4,2")
         .attr("opacity", 0.4);
-      lineEnd.append("title").text(`Func End: ${e.end.toLocaleTimeString()}`);
 
       funcLines.push({ start: lineStart, end: lineEnd, data: e });
     });
@@ -115,7 +132,7 @@ Promise.all([
       })
       .on("mousemove", function(event) {
         const bisect = d3.bisector(d => d.timestamp).left;
-        const [mouseX, mouseY] = d3.pointer(event);
+        const [mouseX] = d3.pointer(event);
         const x0 = x.invert(mouseX);
         const i = bisect(data, x0, 1);
         const d0 = data[i - 1], d1 = data[i];
